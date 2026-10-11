@@ -1005,6 +1005,17 @@
       p.rot += p.vr * dt;
     }
 
+    // zone change: announce the new act with a Mastermind line (once per zone)
+    const zi = zoneAt(player.x);
+    if (zi !== zoneIdx && state === "play") {
+      const first = zoneIdx === -1;
+      zoneIdx = zi;
+      if (!first) {
+        showToast("\u25B6 " + ZONES[zi].name, 2.2);
+        tone(180, 0.3, "triangle", 0.06, 300);
+      }
+    }
+
     // entities (dinosaurs walk, wings flap, hands slap) — they act on the player
     updateEntities(dt);
 
@@ -1057,31 +1068,191 @@
   }
 
   /* --------------------------------------------------------------- render */
+  /* --------------------------------------------------------------- zones  */
+  // The level is four themed acts, not one corridor. Each brings its own sky,
+  // scenery and particles, and announces itself with a Mastermind line.
+  const ZONES = [
+    {
+      name: "THE BAMBOO SHRINE", at: 0,
+      sky: ["#06121c", "#0b2434", "#123b45", "#1c5560"],
+      ridge: ["#123039", "#0d2229"], hill: ["#15414a", "#0d2b33"],
+      accent: "#7fe6c8", fog: "150,220,205", ember: null, style: "bamboo",
+      line: ["THE MASTERMIND", "A quiet shrine. Nothing here will help you jump."],
+    },
+    {
+      name: "THE SPIRIT FOREST", at: 900,
+      sky: ["#160a26", "#2a1140", "#3d1a52", "#52245f"],
+      ridge: ["#2c1440", "#1d0e2c"], hill: ["#351a48", "#231034"],
+      accent: "#d98cff", fog: "200,140,240", ember: "#e0a0ff", style: "torii",
+      line: ["THE MASTERMIND", "The lanterns are lit for you. They are not lit for anyone else."],
+    },
+    {
+      name: "THE RED GATE", at: 2000,
+      sky: ["#2a0810", "#4a0f18", "#6b1620", "#8a2026"],
+      ridge: ["#3d1018", "#260a10"], hill: ["#4a141c", "#2c0c12"],
+      accent: "#ff6b5a", fog: "255,120,100", ember: "#ff8a5a", style: "gate",
+      line: ["THE MASTERMIND", "Everything past this gate is on purpose."],
+    },
+    {
+      name: "THE DRAGON'S END", at: 2950,
+      sky: ["#07040f", "#160a2e", "#2b0f45", "#43155c"],
+      ridge: ["#1e0f34", "#140a24"], hill: ["#27143f", "#180c2a"],
+      accent: "#ff4fd8", fog: "210,110,220", ember: "#ff6be0", style: "dragon",
+      line: ["THE MASTERMIND", "The portal is right there. It has been right there the whole time."],
+    },
+  ];
+  function zoneAt(x) {
+    let z = 0;
+    for (let i = 0; i < ZONES.length; i++) if (x >= ZONES[i].at) z = i;
+    return z;
+  }
+  let zoneIdx = -1;
+
   function renderBackground(cx) {
     const m = dread();
-    // sky: cold blue night bleeding toward a red furnace as you near the portal
+    const Z = ZONES[zoneAt(player.x)];
+    // sky: each zone owns its palette, warmed slightly as the portal nears
+    const warm = m > 0.6 ? 0.25 : 0;
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, m < 0.5 ? "#04081a" : "#12040a");
-    g.addColorStop(0.40, m < 0.5 ? "#0b1836" : "#260a18");
-    g.addColorStop(0.68, m < 0.5 ? "#16294e" : "#3d0f22");
-    g.addColorStop(1, m < 0.5 ? "#22385c" : "#4a1226");
+    for (let i = 0; i < 4; i++) {
+      const c = mixHex(Z.sky[i], "#3a0d18", warm * (i / 3));
+      g.addColorStop([0, 0.40, 0.68, 1][i], c);
+    }
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
     drawStars();
-    drawMoon(cx);
+    drawMoon(cx, Z);
     drawWatcher(cx);
     drawClouds(cx);
-    // layered parallax backdrop, all seated on the horizon (darkening + reddening)
-    drawRange(cx, 0.10, GROUND_Y - 30, m < 0.5 ? "#0f2140" : "#1a0c18", m < 0.5 ? "#0a1830" : "#140810", 150, 300);
-    drawSkyline(cx, 0.30, GROUND_Y + 2);
-    drawHills(cx, 0.46, GROUND_Y + 2, m < 0.5 ? "#122a48" : "#26121f", 66, 300);
-    drawHills(cx, 0.64, GROUND_Y + 2, m < 0.5 ? "#0a1830" : "#1c0d16", 92, 240);
-    drawFog();
-    drawMotes(cx);
+    drawZoneScenery(cx, Z);
+    drawFog(Z);
+    drawMotes(cx, Z);
+  }
+
+  function drawZoneScenery(cx, Z) {
+    const par = Z.style === "bamboo" ? 0.16 : Z.style === "torii" ? 0.24 : 0.30;
+    drawRange(cx, par, GROUND_Y - 30, Z.ridge[0], Z.ridge[1], 150, 300);
+    if (Z.style === "torii" || Z.style === "gate" || Z.style === "dragon") drawSkyline(cx, 0.34, GROUND_Y + 2, Z);
+    drawHills(cx, 0.50, GROUND_Y + 2, Z.hill[0], 66, 300);
+    drawHills(cx, 0.68, GROUND_Y + 2, Z.hill[1], 92, 240);
+    if (Z.style === "bamboo") drawBamboo(cx);
+    if (Z.style === "torii") drawTorii(cx);
+    if (Z.style === "gate") drawTorii(cx, true);
+    if (Z.style === "dragon") drawDragon(cx);
+  }
+
+  // swaying bamboo stalks — motion sells the "living" magical world
+  function drawBamboo(cx) {
+    const par = 0.42, step = 78;
+    const start = Math.floor((cx * par - 300) / step), end = Math.ceil((cx * par + W + 300) / step);
+    for (let j = start; j <= end; j++) {
+      const x = j * step - cx * par + h1(j * 1.7) * 40;
+      const hgt = 210 + h1(j * 3.3) * 130;
+      const sw = Math.sin(now * 0.7 + j) * 5;
+      ctx.strokeStyle = j % 3 === 0 ? "#1e5a4a" : "#16463c";
+      ctx.lineWidth = 7 + h1(j) * 4;
+      ctx.beginPath();
+      ctx.moveTo(x, GROUND_Y + 6);
+      ctx.quadraticCurveTo(x + sw, GROUND_Y - hgt * 0.5, x + sw * 2.2, GROUND_Y - hgt);
+      ctx.stroke();
+      // leaf blades
+      ctx.lineWidth = 3;
+      for (let b = 1; b <= 4; b++) {
+        const t = b / 5, ly = GROUND_Y - hgt * t, lx = x + sw * t * 2;
+        const dir = b % 2 ? 1 : -1;
+        ctx.beginPath(); ctx.moveTo(lx, ly);
+        ctx.quadraticCurveTo(lx + dir * 22, ly - 10, lx + dir * 34, ly + 6);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawTorii(cx, grand) {
+    const par = grand ? 0.58 : 0.5, step = grand ? 620 : 430;
+    const start = Math.floor((cx * par - 500) / step), end = Math.ceil((cx * par + W + 500) / step);
+    for (let j = start; j <= end; j++) {
+      const x = j * step - cx * par + h1(j) * 90;
+      const sc = (grand ? 1.5 : 1) * (0.9 + h1(j * 2.2) * 0.3);
+      const hgt = 210 * sc, wdt = 150 * sc;
+      const glow = 0.5 + 0.5 * Math.sin(now * 1.2 + j);
+      ctx.save();
+      ctx.translate(x, GROUND_Y);
+      // pillars
+      ctx.fillStyle = grand ? "#8f1620" : "#6d1220";
+      ctx.fillRect(-wdt / 2, -hgt, 13 * sc, hgt);
+      ctx.fillRect(wdt / 2 - 13 * sc, -hgt, 13 * sc, hgt);
+      // kasagi (top beam) with curve
+      ctx.fillStyle = grand ? "#b01f28" : "#8a1a22";
+      ctx.beginPath();
+      ctx.moveTo(-wdt * 0.62, -hgt);
+      ctx.quadraticCurveTo(0, -hgt - 22 * sc, wdt * 0.62, -hgt);
+      ctx.lineTo(wdt * 0.62, -hgt + 14 * sc);
+      ctx.quadraticCurveTo(0, -hgt - 4 * sc, -wdt * 0.62, -hgt + 14 * sc);
+      ctx.closePath(); ctx.fill();
+      // nuki (second beam)
+      ctx.fillRect(-wdt * 0.46, -hgt * 0.78, wdt * 0.92, 10 * sc);
+      // paper lanterns
+      ctx.globalAlpha = 0.55 + glow * 0.45;
+      for (const lx of [-wdt * 0.3, wdt * 0.3]) {
+        const lg = ctx.createRadialGradient(lx, -hgt * 0.66, 1, lx, -hgt * 0.66, 34);
+        lg.addColorStop(0, "rgba(255,190,120,.85)");
+        lg.addColorStop(1, "rgba(255,150,80,0)");
+        ctx.fillStyle = lg;
+        ctx.beginPath(); ctx.arc(lx, -hgt * 0.66, 34, 0, 6.28); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+
+  // a coiled dragon breathing light over the final stretch
+  function drawDragon(cx) {
+    const par = 0.2;
+    const x = W * 0.72 - cx * par;
+    const y = H * 0.30 + Math.sin(now * 0.8) * 8;
+    const breathe = 0.5 + 0.5 * Math.sin(now * 2.2);
+    ctx.save();
+    ctx.translate(x, y);
+    // coils
+    ctx.strokeStyle = "rgba(150,60,190,.55)";
+    ctx.lineWidth = 20; ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let i = 0; i <= 26; i++) {
+      const t = i / 26;
+      const a = t * Math.PI * 2.4 + now * 0.35;
+      const r = 130 * (1 - t * 0.55);
+      const px2 = Math.cos(a) * r * 1.5;
+      const py2 = Math.sin(a) * r * 0.62 + t * 60;
+      i ? ctx.lineTo(px2, py2) : ctx.moveTo(px2, py2);
+    }
+    ctx.stroke();
+    // head
+    ctx.fillStyle = "#a04ad0";
+    ctx.beginPath(); ctx.ellipse(150, -34, 34, 20, -0.3, 0, 6.28); ctx.fill();
+    // horns
+    ctx.strokeStyle = "#d8a0ff"; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(160, -52); ctx.lineTo(150, -84); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(176, -48); ctx.lineTo(184, -76); ctx.stroke();
+    // eye + maw glow
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(158, -40, 7, 0, 6.28); ctx.fill();
+    ctx.fillStyle = "#ff2f6e"; ctx.beginPath(); ctx.arc(159, -40, 3.4, 0, 6.28); ctx.fill();
+    const mg = ctx.createRadialGradient(186, -28, 2, 186, -28, 40);
+    mg.addColorStop(0, "rgba(255,80,180," + (0.3 + breathe * 0.4).toFixed(3) + ")");
+    mg.addColorStop(1, "rgba(255,80,180,0)");
+    ctx.fillStyle = mg;
+    ctx.beginPath(); ctx.arc(186, -28, 40, 0, 6.28); ctx.fill();
+    ctx.restore();
   }
 
   // 0..1 continuous progress toward the portal — drives the whole atmosphere
   function dread() { return clamp(player.x / GOAL.x, 0, 1); }
+
+  function mixHex(a, b, u) {
+    const pa = [parseInt(a.slice(1, 3), 16), parseInt(a.slice(3, 5), 16), parseInt(a.slice(5, 7), 16)];
+    const pb = [parseInt(b.slice(1, 3), 16), parseInt(b.slice(3, 5), 16), parseInt(b.slice(5, 7), 16)];
+    const c = pa.map((v, i) => Math.round(v + (pb[i] - v) * u));
+    return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+  }
 
   function drawStars() {
     ctx.save();
@@ -1098,21 +1269,25 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawMoon(cx) {
+  function drawMoon(cx, Z) {
     const m = dread();
     const mx = W * 0.80 - cx * 0.03, my = H * 0.19, r = 44;
     const g = ctx.createRadialGradient(mx, my, r * 0.4, mx, my, r * 3.3);
-    const gc = m < 0.5 ? "190,220,255" : "255,90,80";
+    const gc = Z && Z.accent ? hexRgbStr(Z.accent) : (m < 0.5 ? "190,220,255" : "255,90,80");
     g.addColorStop(0, "rgba(" + gc + "," + (0.30 + m * 0.22).toFixed(3) + ")");
     g.addColorStop(1, "rgba(" + gc + ",0)");
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mx, my, r * 3.3, 0, 6.28); ctx.fill();
-    // the moon bleeds red as you approach the portal
+    // a supermoon: bigger and brighter deep in the run
+    const rr = r * (1 + m * 0.35);
     ctx.fillStyle = m < 0.5 ? "#e8f1ff" : "#ff9a86";
-    ctx.beginPath(); ctx.arc(mx, my, r, 0, 6.28); ctx.fill();
-    ctx.fillStyle = "rgba(150,175,210,.45)";
+    ctx.beginPath(); ctx.arc(mx, my, rr, 0, 6.28); ctx.fill();
+    ctx.fillStyle = "rgba(150,175,210,.40)";
     ctx.beginPath(); ctx.arc(mx - 13, my - 7, 7, 0, 6.28); ctx.fill();
     ctx.beginPath(); ctx.arc(mx + 12, my + 9, 5, 0, 6.28); ctx.fill();
     ctx.beginPath(); ctx.arc(mx + 3, my - 17, 4, 0, 6.28); ctx.fill();
+  }
+  function hexRgbStr(h) {
+    return parseInt(h.slice(1, 3), 16) + "," + parseInt(h.slice(3, 5), 16) + "," + parseInt(h.slice(5, 7), 16);
   }
 
   // the Mastermind: a watching eye in the sky that tracks the player
@@ -1181,17 +1356,28 @@
     ctx.lineTo(W + 300, H); ctx.closePath(); ctx.fill();
   }
 
-  function drawSkyline(cx, par, baseY) {
+  function drawSkyline(cx, par, baseY, Z) {
     const off = cx * par, span = 62;
     const start = Math.floor((off - 260) / span);
     const end = Math.ceil((off + W + 260) / span);
+    const body = Z && Z.ridge ? Z.ridge[0] : "#0b1524";
+    const win = Z && Z.accent ? Z.accent : "255,214,140";
     for (let j = start; j <= end; j++) {
       const bw = 34 + h1(j * 5.1) * 30;
       const bh = 46 + h1(j * 5.7 + 1) * 150;
       const bx = j * span - off, by = baseY - bh;
-      ctx.fillStyle = "#0b1524";
+      ctx.fillStyle = body;
       ctx.fillRect(bx, by, bw, bh + 80);
-      ctx.fillStyle = "rgba(255,214,140,.5)";
+      // pagoda roof hint on taller towers
+      if (bh > 150) {
+        ctx.fillStyle = body;
+        ctx.beginPath();
+        ctx.moveTo(bx - 8, by);
+        ctx.quadraticCurveTo(bx + bw / 2, by - 16, bx + bw + 8, by);
+        ctx.lineTo(bx + bw, by + 6); ctx.lineTo(bx, by + 6);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = "rgba(" + win + ",.5)";
       for (let wy = by + 8; wy < baseY - 6; wy += 14)
         for (let wx = bx + 6; wx < bx + bw - 6; wx += 12)
           if (h1(wx * 0.7 + wy * 1.3 + j) > 0.62) ctx.fillRect(wx, wy, 4, 5);
@@ -1214,19 +1400,19 @@
     ctx.lineTo(W + 300, H); ctx.closePath(); ctx.fill();
   }
 
-  function drawFog() {
+  function drawFog(Z) {
     const m = dread();
     const g = ctx.createLinearGradient(0, GROUND_Y - 90, 0, GROUND_Y + 30);
-    const fc = m < 0.5 ? "130,170,215" : "220,110,120";
+    const fc = Z && Z.fog ? Z.fog : (m < 0.5 ? "130,170,215" : "220,110,120");
     g.addColorStop(0, "rgba(" + fc + ",0)");
     g.addColorStop(1, "rgba(" + fc + "," + (0.20 + m * 0.22).toFixed(3) + ")");
     ctx.fillStyle = g; ctx.fillRect(0, GROUND_Y - 90, W, 120);
   }
 
-  function drawMotes(cx) {
+  function drawMotes(cx, Z) {
     const m = dread();
-    // motes drift upward; late in the run they become red embers
-    const rising = m > 0.45;
+    // drifting motes; in the magical zones they become rising spirit embers
+    const rising = !!(Z && Z.ember);
     for (let i = 0; i < 44; i++) {
       const x = h1(i * 7 + 2) * 2600 - cx * 0.9;
       if (x < -20 || x > W + 20) continue;
@@ -1236,7 +1422,7 @@
         : (((h1(i * 7 + 3) * H - drift) % H) + H) % H;
       const flick = rising ? (0.5 + 0.5 * Math.sin(now * 6 + i)) : 1;
       ctx.globalAlpha = (0.12 + 0.26 * h1(i * 7 + 5)) * (rising ? (0.3 + m * 0.9) * flick : 1);
-      ctx.fillStyle = rising ? "#ff7a4a" : "#bfeaff";
+      ctx.fillStyle = rising ? Z.ember : "#bfeaff";
       ctx.beginPath(); ctx.arc(x, yy, (rising ? 1 + m : 1) + h1(i * 7 + 6) * 1.6, 0, 6.28); ctx.fill();
     }
     ctx.globalAlpha = 1;
