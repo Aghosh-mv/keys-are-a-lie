@@ -16,10 +16,11 @@ ok(K().banked === 0, "warp did NOT cross the checkpoint (banked=" + K().banked +
 die();
 ok(K().state === "dead", "died in the damage zone (state=" + K().state + ")");
 ok(K().carried === 0, "the un-banked soul is gone (carried=" + K().carried + ")");
-ok(K().banked === 0, "nothing banked, so nothing survives (banked=" + K().banked + ")");
-
+// (Codex discovery pays straight into `banked`, so banked may be non-zero here)
+// what must hold is that death adds nothing and loses no banked souls
+const bankedAtDeath = K().banked;
 els.retryBtn.click();
 ok(K().state === "play", "respawned");
 ok(K().carried === 0, "still carrying nothing after respawn");
-ok(K().banked === 0, "no souls farmed by respawning (banked=" + K().banked + ")");
+ok(K().banked === bankedAtDeath, "respawning farms no souls (banked=" + K().banked + ")");
 done();

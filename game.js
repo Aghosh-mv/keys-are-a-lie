@@ -88,6 +88,10 @@
   const elShop = $("shop");
   const elShopList = $("shopList");
   const elShopBank = $("shopBank");
+  const elCodex = $("codex");
+  const elCodexList = $("codexList");
+  const elCodexCount = $("codexCount");
+  const elCodexFoot = $("codexFoot");
   const elCine = $("cine");
   const elCineName = $("cineName");
   const elCineText = $("cineText");
@@ -96,7 +100,7 @@
   /* ---------------------------------------------------- persistent meta */
   // only souls you BANK survive a death. carried is at risk. cosmetics persist.
   function loadMeta() {
-    const def = { banked: 0, bestStreak: 0, bestPct: 0, owned: {}, trail: 0, seenIntro: false };
+    const def = { banked: 0, bestStreak: 0, bestPct: 0, owned: {}, trail: 0, seenIntro: false, known: {} };
     try {
       const raw = window.localStorage && window.localStorage.getItem(META_KEY);
       if (!raw) return def;
@@ -122,6 +126,7 @@
   let lastCP = -1;               // index of last checkpoint banked (-1 = start)
   let probes = 3;                // CAREFUL tests — scarce, and the only real information
   const PROBE_MAX = 5;
+  const STRAIN_MAX = 4;          // launches before you start paying for them
 
   const held = new Set();        // currently held key ids
   const heldSince = {};          // id -> when it was (re)armed, for camp-punish
@@ -141,7 +146,7 @@
   let leakId = null;
 
   // player
-  const player = { x: 80, y: GROUND_Y - 52, w: 44, h: 52, vx: 0, vy: 0, onGround: false, face: 1, coyote: 0, py: 0, landT: 0, hurt: 0, wasGround: false, dazed: 0, hp: HP_MAX, maxHp: HP_MAX, invuln: 0, flyT: 0 };
+  const player = { x: 80, y: GROUND_Y - 52, w: 44, h: 52, vx: 0, vy: 0, onGround: false, face: 1, coyote: 0, py: 0, landT: 0, hurt: 0, wasGround: false, dazed: 0, hp: HP_MAX, maxHp: HP_MAX, invuln: 0, flyT: 0, strain: 0 };
   let camCur = 80 - W * 0.38;    // smoothed camera x (follows player lazily)
 
   // screen effects
@@ -452,7 +457,7 @@
     player.x = cp ? cp.x : 80;
     player.y = GROUND_Y - player.h;
     player.vx = 0; player.vy = 0; player.onGround = false;
-    player.hp = player.maxHp; player.invuln = 0; player.hurt = 0; player.dazed = 0; player.flyT = 0;
+    player.hp = player.maxHp; player.invuln = 0; player.hurt = 0; player.dazed = 0; player.flyT = 0; player.strain = 0;
     camCur = clamp(player.x - W * 0.38, 0, LEVEL_W - W);
     scr.shake = 0; scr.flash = 0;
     freezeUntil = -1; xaxisUntil = -1; pullUntil = -1;
@@ -663,7 +668,7 @@
     rain:      { vy: -700, txt: "the downpour DROPS you upward" },
   };
 
-  function disasterMove(type) {
+  function disasterMove(type, word) {
     const L = LAUNCH[type];
     if (!L) return false;
     const grounded = player.onGround || player.coyote > 0;
@@ -676,6 +681,15 @@
     if (L.vx) player.vx = Math.sign(player.vx || 1) * L.vx;
     if (L.fly) player.flyT = L.fly;                 // wings = a second of real air time
     if (!grounded) player.vx *= 1.15;
+    // STRAIN: launching is free, but doing it constantly is not. Without this,
+    // spamming a lifting key would make you untouchable and the stakes vanish.
+    player.strain += 1;
+    if (player.strain >= STRAIN_MAX) {
+      player.strain = 0;
+      const sd = damageForPhase();
+      if (sd > 0) hurt(sd, "You threw yourself around until something broke.");
+      else showToast("OUT OF BREATH", 0.9);
+    }
     // hitstop + punch so a launch reads as an IMPACT, not a state change
     scr.hitstop = 0.055;
     scr.shake = Math.min(scr.shake + 9, 30);
@@ -689,6 +703,16 @@
       });
     }
     tone(520, 0.12, "square", 0.05, 980);
+    // KNOWLEDGE PERSISTS. The first time a word is learned to lift you, it is
+    // written into the Codex forever and pays a bonus — so no run is ever wasted.
+    if (word && !meta.known[word]) {
+      meta.known[word] = { t: type, v: L.txt };
+      meta.banked += 1;
+      saveMeta();
+      showToast("\uD83D\uDCD6 NEW CODEX ENTRY: " + word.toUpperCase() + "  (+1 soul)", 2.4);
+      tone(1320, 0.1, "square", 0.07, 1760);
+      setTimeout(() => tone(1760, 0.16, "square", 0.06, 2200), 110);
+    }
     return true;
   }
 
@@ -700,7 +724,7 @@
     showToast(m.emoji + "  " + keyLabel(id) + " stands for " + m.word.toUpperCase() + "!" + tag, 1.7);
     // if this disaster can move you, it does — being punished IS the transport
     const L = LAUNCH[m.type];
-    const lifted = disasterMove(m.type);
+    const lifted = disasterMove(m.type, m.word);
     if (lifted && L) showToast(L.txt + "  —  " + m.word.toUpperCase(), 1.7);
     player.hurt = 0.35;               // the character flinches — a real cost, not just an animation
     player.dazed = Math.max(player.dazed, stacks > 1 ? 1.1 : 0.5);
@@ -920,6 +944,7 @@
     player.hurt = Math.max(0, player.hurt - dt);
     player.dazed = Math.max(0, player.dazed - dt);
     player.invuln = Math.max(0, player.invuln - dt);
+    player.strain = Math.max(0, player.strain - dt * 0.5);
 
     // cosmetic trail
     if (meta.owned.trail) trail.push({ x: player.x + player.w / 2, y: player.y + player.h / 2, life: 0.5, max: 0.5 });
@@ -1064,7 +1089,7 @@
     punishments = 0; coins = 0; carried = 0; streak = 0; lastCP = -1; probes = 3;
     elPunish.textContent = "0"; elCoin.textContent = "0";
     player.x = 80; player.y = GROUND_Y - player.h; player.vx = 0; player.vy = 0; player.onGround = false;
-    player.landT = 0; player.hurt = 0; player.dazed = 0; player.wasGround = false; player.flyT = 0;
+    player.landT = 0; player.hurt = 0; player.dazed = 0; player.wasGround = false; player.flyT = 0; player.strain = 0;
     player.hp = player.maxHp; player.invuln = 0;
     camCur = clamp(player.x - W * 0.38, 0, LEVEL_W - W);
     coinList.forEach((c) => (c.got = false));
@@ -2449,6 +2474,42 @@
   }
   elCineSkip.addEventListener("click", (e) => { e.stopPropagation(); endCine(); });
   elCine.addEventListener("click", () => advanceCine());
+  /* ------------------------------------------------------------- codex  */
+  // The permanent record of what you have learned. Deaths erase souls but
+  // never this — it is the one thing you always take with you.
+  const TOTAL_LIFT_WORDS = 22;   // unknown slots shown as hints to chase
+  function renderCodex() {
+    const words = Object.keys(meta.known);
+    words.sort((a, b) => a.localeCompare(b));
+    let html = "";
+    for (const w of words) {
+      const e = meta.known[w];
+      html += "<div class='codexrow'><b>" + w.toUpperCase() + "</b><span>" + e.v + "</span></div>";
+    }
+    // undiscovered slots, so there is always a visible next thing to find
+    for (let i = words.length; i < TOTAL_LIFT_WORDS; i++) {
+      html += "<div class='codexrow unknown'><b>? ? ?</b><span>not yet learned</span></div>";
+    }
+    elCodexList.innerHTML = html;
+    elCodexCount.textContent = words.length;
+    elCodexFoot.textContent = words.length + " / " + TOTAL_LIFT_WORDS + " discovered — press random keys until something throws you.";
+  }
+  function openCodex() {
+    if (state === "shop" || state === "cine") return;
+    prevCodexState = state;
+    state = "codex";
+    renderCodex();
+    elCodex.classList.remove("hidden");
+  }
+  function closeCodex() {
+    if (state !== "codex") return;
+    state = prevCodexState === "codex" ? "play" : prevCodexState;
+    elCodex.classList.add("hidden");
+    if (state === "play") rollContract();
+    updateHud();
+  }
+  let prevCodexState = "menu";
+
   /* -------------------------------------------------------------- the dealer */
   // spending banked souls — the reward for a clean run, the reason banking mattered
   const SHOP_ITEMS = [
@@ -2500,6 +2561,9 @@
       tone(700, 0.12, "square", 0.06, 990);
     }
   }
+  $("codexBtn").addEventListener("click", () => { openCodex(); $("codexBtn").blur(); });
+  $("closeCodex").addEventListener("click", () => { closeCodex(); });
+
   $("shopBtn").addEventListener("click", () => { openShop(); $("shopBtn").blur(); });
   $("closeShop").addEventListener("click", () => { closeShop(); });
   elShopList.addEventListener("click", (e) => {
@@ -2553,6 +2617,8 @@
       return true;
     },
     get probes() { return probes; },
+    get known() { return meta.known; },
+    get codexCount() { return Object.keys(meta.known).length; },
     // QA only: seed carried souls so economy tests exercise logic, not luck.
     grantSouls(n) { carried += n; coins = carried; updateHud(); return carried; },
   };

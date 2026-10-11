@@ -21,6 +21,7 @@
     <div class="hudbox" id="probeBox" title="hold SHIFT and press a key to test it safely">PROBES <span id="probeCount">3</span></div>
     <div id="goalbar"><div id="goalbarfill"></div></div>
     <button id="shopBtn" title="spend banked souls">SHOP</button>
+    <button id="codexBtn" title="what you have learned">CODEX <span id="codexCount">0</span></button>
     <button id="revealBtn" title="show the truth (costs you)">REVEAL</button>
     <button id="muteBtn" title="sound">&#128266;</button>
   </div>
@@ -67,6 +68,14 @@
     <p class="dim">Banked souls: <span id="shopBank">0</span></p>
     <div id="shopList"></div>
     <button id="closeShop">LEAVE</button>
+  </div>
+
+  <div id="codex" class="overlay hidden">
+    <h1>CODEX</h1>
+    <p class="dim">Every disaster that has ever picked you up. This knowledge survives death.</p>
+    <div id="codexList"></div>
+    <p class="dim" id="codexFoot"></p>
+    <button id="closeCodex">CLOSE</button>
   </div>
 
   <div id="cine" class="hidden">

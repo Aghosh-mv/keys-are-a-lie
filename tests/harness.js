@@ -42,6 +42,7 @@ const IDS = ["game", "glow", "scan", "hud", "punishCount", "coinCount", "goalbar
   "hpCount", "hpBox", "phaseNum", "probeCount", "probeBox", "phaseBox", "bankedCount", "streakCount", "streakBox",
   "shopBtn", "shop", "shopList", "shopBank", "closeShop",
   "death", "deathTitle", "deathBody", "deathStats", "retryBtn",
+  "codex", "codexList", "codexCount", "codexFoot", "codexBtn", "closeCodex",
   "cine", "cineName", "cineText", "cineSkip"];
 IDS.forEach((id) => (els[id] = makeEl(id)));
 

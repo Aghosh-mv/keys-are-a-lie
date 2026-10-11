@@ -56,7 +56,8 @@ die(120, false);
 ok(K().state === "cine", "death cutscene plays (state=" + K().state + ")");
 skipCine();
 ok(K().state === "dead", "death overlay shown");
-ok(K().banked === bankedBefore, "banked souls SURVIVE death (banked=" + K().banked + ")");
+ok(K().banked >= bankedBefore, "banked souls SURVIVE death (banked " + bankedBefore +
+  "->" + K().banked + "; it may grow from codex discoveries, never shrink)");
 ok(K().carried === 0, "carried souls LOST on death");
 ok(K().streak === 0, "streak reset on death");
 ok(/banked kept/.test(els.deathStats.textContent), "death screen states the loss");
