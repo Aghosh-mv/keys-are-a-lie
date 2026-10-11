@@ -157,6 +157,36 @@ html,body{
 #death button{background:#ff2b3d;color:#fff;box-shadow:0 0 26px rgba(255,43,61,.7);}
 #death button:hover{background:#ff6b78;}
 
+/* ---------- Act title card ---------- */
+#zonecard{
+  position:absolute;inset:0;z-index:18;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  opacity:0;
+}
+#zonecard.hidden{display:none;}
+#zonecard.show{animation:zoneIn 2.6s ease-out forwards;}
+@keyframes zoneIn{
+  0%{opacity:0;letter-spacing:.5em;}
+  14%{opacity:1;letter-spacing:.22em;}
+  72%{opacity:1;letter-spacing:.22em;}
+  100%{opacity:0;letter-spacing:.3em;}
+}
+#zoneName{
+  font:700 clamp(22px,4.4vw,44px)/1.1 ui-monospace,monospace;letter-spacing:.22em;
+  color:#fff;text-shadow:0 3px 24px rgba(0,0,0,.75),0 0 40px rgba(0,0,0,.4);
+  padding:0 24px;text-align:center;
+}
+#zoneSub{
+  font:400 11px/1 ui-monospace,monospace;letter-spacing:.5em;color:rgba(255,255,255,.7);
+  text-shadow:0 2px 10px rgba(0,0,0,.8);text-transform:uppercase;
+}
+#zonecard::before,#zonecard::after{
+  content:"";position:absolute;left:8%;right:8%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
+}
+#zonecard::before{top:38%;}
+#zonecard::after{top:62%;}
+
 /* ---------- Codex: the knowledge that survives death ---------- */
 #codex{background:rgba(4,2,14,.93);}
 #codexList{

@@ -875,6 +875,13 @@
     // cutscene plays with the game paused
     if (cine.on) updateCine(dt);
 
+    // act title card fades itself out
+    if (zoneCardUntil > 0 && now > zoneCardUntil) {
+      zoneCardUntil = -1;
+      const el = $("zonecard");
+      if (el) { el.classList.remove("show"); el.classList.add("hidden"); }
+    }
+
     // screen effect decay
     scr.shake *= Math.pow(0.0025, dt); if (scr.shake < 0.05) scr.shake = 0;
     scr.flash = Math.max(0, scr.flash - dt * 2.2);
@@ -1051,7 +1058,7 @@
       const first = zoneIdx === -1;
       zoneIdx = zi;
       if (!first) {
-        showToast("\u25B6 " + ZONES[zi].name, 2.2);
+        showZoneCard(ZONES[zi].name, ["act i", "act ii", "act iii", "act iv"][zi]);
         tone(180, 0.3, "triangle", 0.06, 300);
       }
     }
@@ -1115,30 +1122,30 @@
   const ZONES = [
     {
       name: "THE BAMBOO SHRINE", at: 0,
-      sky: ["#06121c", "#0b2434", "#123b45", "#1c5560"],
-      ridge: ["#123039", "#0d2229"], hill: ["#15414a", "#0d2b33"],
-      accent: "#7fe6c8", fog: "150,220,205", ember: null, style: "bamboo",
-      line: ["THE MASTERMIND", "A quiet shrine. Nothing here will help you jump."],
+      sky: ["#8fd0f2", "#a8ddf5", "#cdeaf7", "#e8f4e4"],
+      ridge: ["#7fa9c4", "#6b93ad"], hill: ["#87b894", "#6d9b7d"],
+      accent: "#3fa88a", fog: "255,255,250", sun: "#fff6d8", style: "bamboo",
+      line: ["THE MASTERMIND", "A quiet shrine, in daylight. Nothing here will help you jump."],
     },
     {
       name: "THE SPIRIT FOREST", at: 900,
-      sky: ["#160a26", "#2a1140", "#3d1a52", "#52245f"],
-      ridge: ["#2c1440", "#1d0e2c"], hill: ["#351a48", "#231034"],
-      accent: "#d98cff", fog: "200,140,240", ember: "#e0a0ff", style: "torii",
+      sky: ["#bfe6c8", "#d6ecc9", "#e9f2cf", "#f4f6d8"],
+      ridge: ["#7fae86", "#5f8f6a"], hill: ["#8cbb8a", "#6d9a70"],
+      accent: "#5aa86a", fog: "250,255,230", sun: "#fff2b0", style: "torii",
       line: ["THE MASTERMIND", "The lanterns are lit for you. They are not lit for anyone else."],
     },
     {
       name: "THE RED GATE", at: 2000,
-      sky: ["#2a0810", "#4a0f18", "#6b1620", "#8a2026"],
-      ridge: ["#3d1018", "#260a10"], hill: ["#4a141c", "#2c0c12"],
-      accent: "#ff6b5a", fog: "255,120,100", ember: "#ff8a5a", style: "gate",
+      sky: ["#ffb27a", "#ff9a63", "#f5824f", "#e9704a"],
+      ridge: ["#b05a3c", "#8c452e"], hill: ["#bd6a44", "#94502f"],
+      accent: "#e0552f", fog: "255,200,160", sun: "#fff0c0", style: "gate",
       line: ["THE MASTERMIND", "Everything past this gate is on purpose."],
     },
     {
       name: "THE DRAGON'S END", at: 2950,
-      sky: ["#07040f", "#160a2e", "#2b0f45", "#43155c"],
-      ridge: ["#1e0f34", "#140a24"], hill: ["#27143f", "#180c2a"],
-      accent: "#ff4fd8", fog: "210,110,220", ember: "#ff6be0", style: "dragon",
+      sky: ["#f2a0c0", "#e07aa8", "#b35696", "#7c3f80"],
+      ridge: ["#8e4a80", "#6b3663"], hill: ["#9c5890", "#77406e"],
+      accent: "#d94fb0", fog: "255,190,225", sun: "#fff0d0", style: "dragon",
       line: ["THE MASTERMIND", "The portal is right there. It has been right there the whole time."],
     },
   ];
@@ -1148,6 +1155,19 @@
     return z;
   }
   let zoneIdx = -1;
+  let zoneCardUntil = -1;
+  function showZoneCard(name, sub) {
+    const el = $("zonecard"), nm = $("zoneName"), sb = $("zoneSub");
+    if (!el || !nm) return;
+    nm.textContent = name;
+    if (sb) sb.textContent = sub || "";
+    el.classList.remove("hidden");
+    el.classList.remove("show");
+    // reflow so the animation restarts
+    void el.offsetWidth;
+    el.classList.add("show");
+    zoneCardUntil = now + 2.6;
+  }
 
   function renderBackground(cx) {
     const m = dread();
@@ -1156,14 +1176,14 @@
     const warm = m > 0.6 ? 0.25 : 0;
     const g = ctx.createLinearGradient(0, 0, 0, H);
     for (let i = 0; i < 4; i++) {
-      const c = mixHex(Z.sky[i], "#3a0d18", warm * (i / 3));
+      const c = mixHex(Z.sky[i], "#ff9a5c", warm * (i / 3));
       g.addColorStop([0, 0.40, 0.68, 1][i], c);
     }
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
     drawStars();
     drawMoon(cx, Z);
-    drawWatcher(cx);
+    drawWatcher(cx, Z);
     drawClouds(cx);
     drawZoneScenery(cx, Z);
     drawFog(Z);
@@ -1190,7 +1210,7 @@
       const x = j * step - cx * par + h1(j * 1.7) * 40;
       const hgt = 210 + h1(j * 3.3) * 130;
       const sw = Math.sin(now * 0.7 + j) * 5;
-      ctx.strokeStyle = j % 3 === 0 ? "#1e5a4a" : "#16463c";
+      ctx.strokeStyle = j % 3 === 0 ? "#7fc06a" : "#6aa85c";
       ctx.lineWidth = 7 + h1(j) * 4;
       ctx.beginPath();
       ctx.moveTo(x, GROUND_Y + 6);
@@ -1295,68 +1315,70 @@
     return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
   }
 
+  // Daylight: soft high clouds and a few birds instead of a starfield.
   function drawStars() {
     ctx.save();
-    for (let i = 0; i < 110; i++) {
-      const x = h1(i * 3 + 1) * W;
-      const y = h1(i * 3 + 2) * H * 0.55;
-      const tw = 0.5 + 0.5 * Math.sin(now * (0.8 + h1(i) * 2.2) + i * 2.1);
-      const r = 0.5 + h1(i * 3 + 3) * 1.5;
-      ctx.globalAlpha = (0.18 + tw * 0.7) * (1 - dread() * 0.55); // stars fade as it gets worse
-      ctx.fillStyle = i % 9 === 0 ? "#ffe6b0" : "#cfe9ff";
-      ctx.beginPath(); ctx.arc(x, y, r, 0, 6.28); ctx.fill();
+    // a few birds drifting across the sky
+    for (let i = 0; i < 5; i++) {
+      const bx = ((h1(i * 3.1) * (W + 400) - now * (12 + h1(i) * 14)) % (W + 400) + W + 400) % (W + 400) - 200;
+      const by = 40 + h1(i * 5.7) * 110;
+      const flap = Math.sin(now * 5 + i * 2) * 3;
+      ctx.strokeStyle = "rgba(40,60,80,.35)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(bx - 6, by - flap); ctx.quadraticCurveTo(bx, by - 3, bx + 6, by - flap);
+      ctx.stroke();
     }
     ctx.restore();
-    ctx.globalAlpha = 1;
   }
 
   function drawMoon(cx, Z) {
     const m = dread();
-    const mx = W * 0.80 - cx * 0.03, my = H * 0.19, r = 44;
-    const g = ctx.createRadialGradient(mx, my, r * 0.4, mx, my, r * 3.3);
-    const gc = Z && Z.accent ? hexRgbStr(Z.accent) : (m < 0.5 ? "190,220,255" : "255,90,80");
-    g.addColorStop(0, "rgba(" + gc + "," + (0.30 + m * 0.22).toFixed(3) + ")");
-    g.addColorStop(1, "rgba(" + gc + ",0)");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mx, my, r * 3.3, 0, 6.28); ctx.fill();
-    // a supermoon: bigger and brighter deep in the run
-    const rr = r * (1 + m * 0.35);
-    ctx.fillStyle = m < 0.5 ? "#e8f1ff" : "#ff9a86";
-    ctx.beginPath(); ctx.arc(mx, my, rr, 0, 6.28); ctx.fill();
-    ctx.fillStyle = "rgba(150,175,210,.40)";
-    ctx.beginPath(); ctx.arc(mx - 13, my - 7, 7, 0, 6.28); ctx.fill();
-    ctx.beginPath(); ctx.arc(mx + 12, my + 9, 5, 0, 6.28); ctx.fill();
-    ctx.beginPath(); ctx.arc(mx + 3, my - 17, 4, 0, 6.28); ctx.fill();
+    const mx = W * 0.80 - cx * 0.03, my = H * 0.19, r = 40;
+    const sunCol = (Z && Z.sun) || "#fff6d8";
+    // warm glow
+    const g = ctx.createRadialGradient(mx, my, r * 0.4, mx, my, r * 4.2);
+    g.addColorStop(0, hexA(sunCol, 0.55 + m * 0.15));
+    g.addColorStop(1, hexA(sunCol, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(mx, my, r * 4.2, 0, 6.28); ctx.fill();
+    // disc
+    ctx.fillStyle = sunCol;
+    ctx.beginPath(); ctx.arc(mx, my, r, 0, 6.28); ctx.fill();
+    ctx.fillStyle = hexA("#ffffff", 0.55);
+    ctx.beginPath(); ctx.arc(mx - 6, my - 6, r * 0.72, 0, 6.28); ctx.fill();
+  }
+  function hexA(hex, a) {
+    return "rgba(" + hexRgbStr(hex) + "," + a + ")";
   }
   function hexRgbStr(h) {
     return parseInt(h.slice(1, 3), 16) + "," + parseInt(h.slice(3, 5), 16) + "," + parseInt(h.slice(5, 7), 16);
   }
 
   // the Mastermind: a watching eye in the sky that tracks the player
-  function drawWatcher(cx) {
+  function drawWatcher(cx, Z) {
     const m = dread();
     const ex = W * 0.27 - cx * 0.02, ey = H * 0.17, rw = 74 + m * 34, rh = 44 + m * 20;
     const blink = Math.pow(Math.max(0, Math.sin(now * 0.9)), 30);
     const px = player.x - camX() + player.w / 2, py = player.y + player.h / 2;
-    const gl = ctx.createRadialGradient(ex, ey, 6, ex, ey, 150 + m * 70);
-    gl.addColorStop(0, "rgba(255,80,130," + (0.26 + m * 0.30).toFixed(3) + ")");
-    gl.addColorStop(1, "rgba(255,80,130,0)");
-    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(ex, ey, 150 + m * 70, 0, 6.28); ctx.fill();
-
+    // in daylight it is a dark shape in a bright sky, not a glowing one
     ctx.save();
-    ctx.globalAlpha = 0.55 + m * 0.35;
+    ctx.globalAlpha = 0.30 + m * 0.22;
     ctx.beginPath(); ctx.ellipse(ex, ey, rw, Math.max(1, rh * (1 - blink)), 0, 0, 6.28);
-    ctx.fillStyle = "rgba(225,238,255,.13)"; ctx.fill();
-    ctx.strokeStyle = "rgba(255,120,165," + (0.55 + m * 0.4).toFixed(3) + ")"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "rgba(28,26,48,.55)"; ctx.fill();
+    ctx.strokeStyle = "rgba(20,18,38,.8)"; ctx.lineWidth = 2.5; ctx.stroke();
     ctx.restore();
 
     const dx = clamp((px - ex) / (W * 0.5), -1, 1), dy = clamp((py - ey) / (H * 0.5), -1, 1);
     const ix = ex + dx * (rw - 22), iy = ey + dy * (rh - 15);
     ctx.save();
-    ctx.globalAlpha = 0.5 + 0.1 * Math.sin(now * 2) + m * 0.3;
+    ctx.globalAlpha = 0.75;
     ctx.beginPath(); ctx.ellipse(ix, iy, 20 + m * 6, Math.max(1, (20 + m * 6) * (1 - blink)), 0, 0, 6.28);
-    ctx.fillStyle = "rgba(255,55,110,.6)"; ctx.fill();
+    ctx.fillStyle = "#d8d2c8"; ctx.fill();          // pale sclera, reads against a blue sky
+    ctx.strokeStyle = "rgba(20,18,38,.9)"; ctx.lineWidth = 2; ctx.stroke();
     ctx.beginPath(); ctx.arc(ix, iy, 8 + m * 3, 0, 6.28);
-    ctx.fillStyle = "rgba(15,0,8,.85)"; ctx.fill();
+    ctx.fillStyle = "#c9243f"; ctx.fill();          // the eye that watches you
+    ctx.beginPath(); ctx.arc(ix, iy, 3.4 + m * 1.5, 0, 6.28);
+    ctx.fillStyle = "#160008"; ctx.fill();
     ctx.restore();
   }
 
@@ -1369,8 +1391,8 @@
       const x = (((base + par + now * (5 + h1(i) * 9)) % span) + span) % span - 230;
       const y = 34 + h1(i * 9 + 5) * H * 0.26;
       const s = 0.7 + h1(i * 9 + 6) * 0.9;
-      ctx.globalAlpha = 0.09 + h1(i * 9 + 7) * 0.10;
-      ctx.fillStyle = "#9fc0e6";
+      ctx.globalAlpha = 0.14 + h1(i * 9 + 7) * 0.16;
+      ctx.fillStyle = "#ffffff";
       blob(x, y, 58 * s);
       blob(x + 52 * s, y + 7 * s, 42 * s);
       blob(x - 48 * s, y + 9 * s, 38 * s);
@@ -1443,28 +1465,25 @@
 
   function drawFog(Z) {
     const m = dread();
-    const g = ctx.createLinearGradient(0, GROUND_Y - 90, 0, GROUND_Y + 30);
-    const fc = Z && Z.fog ? Z.fog : (m < 0.5 ? "130,170,215" : "220,110,120");
+    // daytime haze sitting on the ground, thickening toward the portal
+    const g = ctx.createLinearGradient(0, GROUND_Y - 100, 0, GROUND_Y + 30);
+    const fc = Z && Z.fog ? Z.fog : "255,255,250";
     g.addColorStop(0, "rgba(" + fc + ",0)");
-    g.addColorStop(1, "rgba(" + fc + "," + (0.20 + m * 0.22).toFixed(3) + ")");
-    ctx.fillStyle = g; ctx.fillRect(0, GROUND_Y - 90, W, 120);
+    g.addColorStop(1, "rgba(" + fc + "," + (0.30 + m * 0.30).toFixed(3) + ")");
+    ctx.fillStyle = g; ctx.fillRect(0, GROUND_Y - 100, W, 130);
   }
 
   function drawMotes(cx, Z) {
-    const m = dread();
-    // drifting motes; in the magical zones they become rising spirit embers
-    const rising = !!(Z && Z.ember);
-    for (let i = 0; i < 44; i++) {
+    // drifting pollen / dust in daylight
+    for (let i = 0; i < 40; i++) {
       const x = h1(i * 7 + 2) * 2600 - cx * 0.9;
       if (x < -20 || x > W + 20) continue;
-      const drift = now * (8 + h1(i) * 16);
-      const yy = rising
-        ? H - (((h1(i * 7 + 3) * H + drift * 2.2) % H))
-        : (((h1(i * 7 + 3) * H - drift) % H) + H) % H;
-      const flick = rising ? (0.5 + 0.5 * Math.sin(now * 6 + i)) : 1;
-      ctx.globalAlpha = (0.12 + 0.26 * h1(i * 7 + 5)) * (rising ? (0.3 + m * 0.9) * flick : 1);
-      ctx.fillStyle = rising ? Z.ember : "#bfeaff";
-      ctx.beginPath(); ctx.arc(x, yy, (rising ? 1 + m : 1) + h1(i * 7 + 6) * 1.6, 0, 6.28); ctx.fill();
+      const drift = now * (6 + h1(i) * 12);
+      const yy = (((h1(i * 7 + 3) * H - drift) % H) + H) % H;
+      const sway = Math.sin(now * 1.3 + i) * 6;
+      ctx.globalAlpha = 0.14 + 0.24 * h1(i * 7 + 5);
+      ctx.fillStyle = (Z && Z.sun) || "#fff2c0";
+      ctx.beginPath(); ctx.arc(x + sway, yy, 1 + h1(i * 7 + 6) * 1.8, 0, 6.28); ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -1479,18 +1498,18 @@
     }
     // grass top for ground, glowing neon plate for floaters
     if (p.h > 60) {
-      ctx.fillStyle = "#1c2c22";
+      ctx.fillStyle = "#4e7a44";
       ctx.fillRect(p.x, p.y, p.w, p.h);
       const gg = ctx.createLinearGradient(0, p.y, 0, p.y + 18);
-      gg.addColorStop(0, "#63b769");
-      gg.addColorStop(1, "#2f6a3a");
+      gg.addColorStop(0, "#7dc46f");
+      gg.addColorStop(1, "#4a8c46");
       ctx.fillStyle = gg;
       ctx.fillRect(p.x, p.y, p.w, 18);
       const pulse = 0.5 + 0.5 * Math.sin(now * 1.6);
       ctx.globalAlpha = 0.22 + pulse * 0.22;
-      ctx.fillStyle = "#9dff5f"; ctx.fillRect(p.x, p.y, p.w, 3);
+      ctx.fillStyle = "#d6ff9a"; ctx.fillRect(p.x, p.y, p.w, 3);
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = "rgba(0,0,0,.22)"; ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(20,40,20,.25)"; ctx.lineWidth = 2;
       for (let x = p.x + 30; x < p.x + p.w; x += 60) { ctx.beginPath(); ctx.moveTo(x, p.y + 18); ctx.lineTo(x, p.y + p.h); ctx.stroke(); }
     } else {
       const pulse = 0.5 + 0.5 * Math.sin(now * 2.6 + p.x * 0.02);
@@ -1498,13 +1517,13 @@
       ctx.fillStyle = "#5ffbf1";
       roundRect(p.x - 4, p.y - 4, p.w + 8, p.h + 16, 10); ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.fillStyle = "#232f47";
+      ctx.fillStyle = "#5d6b86";
       ctx.fillRect(p.x, p.y, p.w, p.h);
-      ctx.fillStyle = "rgba(95,251,241,.16)";
+      ctx.fillStyle = "rgba(190,235,255,.45)";
       ctx.fillRect(p.x, p.y + 4, p.w, p.h - 4);
-      ctx.fillStyle = "#5ffbf1";
+      ctx.fillStyle = "#eafcff";
       ctx.fillRect(p.x, p.y, p.w, 4);
-      ctx.fillStyle = "#9dff5f";
+      ctx.fillStyle = "#eaffb0";
       ctx.fillRect(p.x, p.y, 4, p.h);
       ctx.fillRect(p.x + p.w - 4, p.y, 4, p.h);
     }
@@ -2238,17 +2257,17 @@
     ctx.scale(p.s, p.s);
     if (p.kind === 0) {
       // gravestone
-      ctx.fillStyle = "#1a2436";
+      ctx.fillStyle = "#8d97ab";
       ctx.beginPath();
       ctx.moveTo(-11, 0); ctx.lineTo(-11, -22);
       ctx.arc(0, -22, 11, Math.PI, 0); ctx.lineTo(11, 0);
       ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(140,170,200,.25)"; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.fillStyle = "rgba(140,170,200,.18)";
+      ctx.strokeStyle = "rgba(60,70,90,.35)"; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = "rgba(60,70,90,.22)";
       ctx.fillRect(-5, -16, 10, 2); ctx.fillRect(-5, -10, 10, 2);
     } else if (p.kind === 1) {
       // dead tree
-      ctx.strokeStyle = "#101a2b"; ctx.lineCap = "round";
+      ctx.strokeStyle = "#3c4a3f"; ctx.lineCap = "round";
       ctx.lineWidth = 6;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-2, -46); ctx.stroke();
       ctx.lineWidth = 3;
@@ -2262,7 +2281,7 @@
     } else if (p.kind === 2) {
       // lantern with a live flame
       const fl = 0.72 + 0.28 * Math.sin(now * 9 + p.ph) * Math.sin(now * 5.3 + p.ph * 2);
-      ctx.strokeStyle = "#0f1726"; ctx.lineWidth = 3;
+      ctx.strokeStyle = "#3a4553"; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -40); ctx.lineTo(10, -40); ctx.stroke();
       ctx.fillStyle = "#0d1420";
       ctx.fillRect(6, -40, 9, 12);
@@ -2275,7 +2294,7 @@
       ctx.beginPath(); ctx.arc(10, -34, 2.6, 0, 6.28); ctx.fill();
     } else {
       // grass tufts
-      ctx.strokeStyle = "#16351f"; ctx.lineWidth = 2; ctx.lineCap = "round";
+      ctx.strokeStyle = "#4a8c46"; ctx.lineWidth = 2; ctx.lineCap = "round";
       for (let b = 0; b < 6; b++) {
         const sx = -12 + b * 5;
         const bend = Math.sin(now * 1.4 + p.ph + b) * 3;
@@ -2294,7 +2313,7 @@
     const step = 150;
     const start = Math.floor((cx * par - 200) / step);
     const end = Math.ceil((cx * par + W + 200) / step);
-    ctx.fillStyle = "#05070d";
+    ctx.fillStyle = "#20303f";
     for (let j = start; j <= end; j++) {
       const x = j * step - cx * par;
       const tall = h1(j * 4.1);
