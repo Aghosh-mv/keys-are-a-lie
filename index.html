@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>KEYS ARE A LIE</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="540"></canvas>
+  <canvas id="glow" width="960" height="540" aria-hidden="true"></canvas>
+  <div id="scan" aria-hidden="true"></div>
+
+  <div id="hud">
+    <div class="hudbox" id="hpBox"><span id="hpCount">&#10084;&#10084;&#10084;</span></div>
+    <div class="hudbox" id="phaseBox">PHASE <span id="phaseNum">1</span></div>
+    <div class="hudbox" id="punishBox">PUNISHED <span id="punishCount">0</span></div>
+    <div class="hudbox" id="coinBox">&#128302; <span id="coinCount">0</span> <span class="bankedtag" id="bankedCount">(0 banked)</span></div>
+    <div class="hudbox" id="streakBox">RUN <span id="streakCount">0</span></div>
+    <div class="hudbox" id="probeBox" title="hold SHIFT and press a key to test it safely">PROBES <span id="probeCount">3</span></div>
+    <div id="goalbar"><div id="goalbarfill"></div></div>
+    <button id="shopBtn" title="spend banked souls">SHOP</button>
+    <button id="revealBtn" title="show the truth (costs you)">REVEAL</button>
+    <button id="muteBtn" title="sound">&#128266;</button>
+  </div>
+
+  <div id="manual">
+    <div class="manualhead">THE MANUAL</div>
+    <div class="slot"><span class="dirlabel">LEFT</span><span id="slotLeft" class="key">?</span></div>
+    <div class="slot"><span class="dirlabel">RIGHT</span><span id="slotRight" class="key">?</span></div>
+    <div class="slot"><span class="dirlabel">JUMP</span><span id="slotJump" class="key">?</span></div>
+    <div id="manualFoot">hold <b>SHIFT</b> + a key to probe it safely</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="start" class="overlay">
+    <h1>KEYS&nbsp;ARE&nbsp;A&nbsp;LIE</h1>
+    <p>Reach the portal at the far right.</p>
+    <p>The <b>Manual</b> tells you which keys work. <b>The Manual lies.</b></p>
+    <p>Press keys until something moves you. Press the <b>wrong</b> key and it will punish you.</p>
+    <p><b>HOLD SHIFT</b> and press a key to <b>probe</b> it: it will never hurt you, and it tells the truth. Probes are limited and the keys re-roll — so you can actually <i>solve</i> this instead of guessing.</p>
+    <p class="dim">The real keys re-roll faster the closer you get. The portal knows you are coming.</p>
+    <p><b>&#10084;</b> Wrong keys cost health once past the first third &mdash; at 0 you are <b>caught</b>.</p>
+    <p><b>&#128302;</b> Souls you pick up are only <b>safe once banked</b> at a checkpoint. Die and the ones you are carrying are <b>gone</b>.</p>
+    <p class="dim">Banked souls buy cosmetics at the Dealer. Best-run record is kept forever.</p>
+    <button id="startBtn">START</button>
+  </div>
+
+  <div id="win" class="overlay hidden">
+    <h1 id="winTitle">YOU MADE IT</h1>
+    <p id="winBody">The portal accepts you.</p>
+    <p class="dim" id="winStats"></p>
+    <button id="againBtn">AGAIN</button>
+  </div>
+
+  <div id="death" class="overlay hidden">
+    <h1 id="deathTitle">CAUGHT</h1>
+    <p id="deathBody"></p>
+    <p class="dim" id="deathStats"></p>
+    <button id="retryBtn">TRY AGAIN</button>
+  </div>
+
+  <div id="shop" class="overlay hidden">
+    <h1>THE DEALER</h1>
+    <p class="dim">Banked souls: <span id="shopBank">0</span></p>
+    <div id="shopList"></div>
+    <button id="closeShop">LEAVE</button>
+  </div>
+
+  <div id="cine" class="hidden">
+    <div class="cinebar top"></div>
+    <div class="cinebar bottom"></div>
+    <div class="cinebox">
+      <div id="cineName">THE MASTERMIND</div>
+      <p id="cineText"></p>
+      <button id="cineSkip">SKIP &#9654;</button>
+    </div>
+  </div>
+</div>
+
+<script src="lexicon.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
