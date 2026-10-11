@@ -1,4 +1,6 @@
 node_modules/
 *.log
 .DS_Store
-dist/
+dist/*
+!dist/keys-are-a-lie.zip
+!dist/screenshot.png

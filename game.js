@@ -2640,6 +2640,14 @@
       return true;
     },
     get probes() { return probes; },
+    get blocked() {
+      return {
+        state, frozen: now < freezeUntil, xaxis: now < xaxisUntil,
+        hitstop: +scr.hitstop.toFixed(3), pull: now < pullUntil,
+        dazed: +player.dazed.toFixed(2), onGround: player.onGround,
+        vx: +player.vx.toFixed(1),
+      };
+    },
     get known() { return meta.known; },
     get codexCount() { return Object.keys(meta.known).length; },
     // QA only: seed carried souls so economy tests exercise logic, not luck.
