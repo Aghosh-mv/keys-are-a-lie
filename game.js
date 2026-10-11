@@ -520,22 +520,28 @@ function spawnParticle(o) {
   }
 
   function fxRain(emoji) {
-    // only three or four, and they obey gravity properly
+    // Aimed at YOU. There is no gravity in this game: things fall toward the
+    // character because they are aimed at them, not because of a physics field.
+    const px = player.x + player.w / 2;
     for (let i = 0; i < 4; i++) {
+      const sx = px + rand(-340, 340);
+      const sy = GROUND_Y - rand(230, 380);
       spawnParticle({
-        x: camX() + rand(80, W - 80), y: rand(-300, -120),
-        vx: rand(-40, 40), vy: rand(60, 180), grav: 1500,
-        emoji: emoji, size: rand(34, 54), life: rand(2.2, 3.4), max: 3.4,
+        x: sx, y: sy,
+        vx: 0, vy: 0, grav: 0, homing: 1.5,
+        emoji: emoji, size: rand(34, 54), life: rand(2.4, 3.4), max: 3.4, drag: 0,
       });
     }
   }
   function fxSwarm(emoji) {
-    for (let i = 0; i < 10; i++) {
-      const a = rand(0, 6.283), d = rand(160, 320);
+    // agents that close in on you from a ring — nothing here obeys gravity
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * 6.283 + rand(-0.3, 0.3), d = rand(240, 380);
       spawnParticle({
-        x: player.x + Math.cos(a) * d, y: player.y + Math.sin(a) * d - 40,
-        vx: 0, vy: 0, grav: 220, homing: 1, emoji: emoji,
-        size: rand(26, 38), life: rand(4, 6), max: 6, drag: 1.6,
+        x: player.x + player.w / 2 + Math.cos(a) * d,
+        y: player.y + player.h / 2 + Math.sin(a) * d * 0.7,
+        vx: 0, vy: 0, grav: 0, homing: 1.35, emoji: emoji,
+        size: rand(26, 38), life: rand(4, 6), max: 6, drag: 0,
       });
     }
     pushPlayer(choice([-1, 1]) * 120, -160);

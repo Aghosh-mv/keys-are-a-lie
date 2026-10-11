@@ -44,6 +44,8 @@ function encode() {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   const r = spawnSync("ffmpeg", [
     "-y", "-framerate", fps.toFixed(3), "-i", path.join(FRAMES, "f%06d.jpg"),
+    // capture height can be odd (960x457) which H.264 cannot encode
+    "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
     "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
     "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
     "-shortest", "-movflags", "+faststart", OUT,
