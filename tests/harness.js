@@ -118,16 +118,15 @@ function bounce() {
 
 function runTo(targetX) {
   let g = 0;
-  while (K().player.x < targetX && g++ < 12000 && K().state === "play") {
+  // generous budget: hitstop eats sim frames during bounce bursts
+  while (K().player.x < targetX && g++ < 60000 && K().state === "play") {
     const c = K().contract;
     if (!/^[a-z0-9]$/.test(c.right)) { K().rollContract(); continue; }
     if (!K().armed.right) press(c.right);
     hold(c.right);
     const px = K().player.x, py = K().player.y;
-    const grounded = py > 360;
-    const nearCoin = COIN_X.some((cx) => cx - px > 18 && cx - px < 150);
-    if (grounded && nearCoin) bounce();
-    tick(2); release(c.right);
+    if (py > 360 && COIN_X.some((cx) => cx - px > 18 && cx - px < 150)) bounce();
+    tick(3); release(c.right);
   }
 }
 

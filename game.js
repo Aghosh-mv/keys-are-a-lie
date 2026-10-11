@@ -145,7 +145,7 @@
   let camCur = 80 - W * 0.38;    // smoothed camera x (follows player lazily)
 
   // screen effects
-  const scr = { shake: 0, flash: 0, dark: 0, invert: 0, tint: null, tintA: 0, spin: 0, spinV: 0 };
+  const scr = { shake: 0, flash: 0, dark: 0, invert: 0, tint: null, tintA: 0, spin: 0, spinV: 0, hitstop: 0 };
   let freezeUntil = -1;
   let xaxisUntil = -1;
   let pullUntil = -1;
@@ -676,6 +676,18 @@
     if (L.vx) player.vx = Math.sign(player.vx || 1) * L.vx;
     if (L.fly) player.flyT = L.fly;                 // wings = a second of real air time
     if (!grounded) player.vx *= 1.15;
+    // hitstop + punch so a launch reads as an IMPACT, not a state change
+    scr.hitstop = 0.055;
+    scr.shake = Math.min(scr.shake + 9, 30);
+    scr.flash = Math.max(scr.flash, 0.22);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * 6.28;
+      spawnParticle({
+        x: player.x + player.w / 2, y: player.y + player.h,
+        vx: Math.cos(a) * rand(90, 260), vy: Math.sin(a) * rand(60, 190) - 60,
+        grav: 700, emoji: "💨", size: rand(12, 24), life: 0.45, max: 0.45,
+      });
+    }
     tone(520, 0.12, "square", 0.05, 980);
     return true;
   }
@@ -808,6 +820,8 @@
 
   /* --------------------------------------------------------------- update */
   function update(dt) {
+    // hitstop freezes the sim briefly so heavy impacts land
+    if (scr.hitstop > 0) { scr.hitstop -= dt; return; }
     now += dt;
 
     // contract re-roll
@@ -1018,6 +1032,7 @@
 
     // entities (dinosaurs walk, wings flap, hands slap) — they act on the player
     updateEntities(dt);
+    updateScarf();
 
     // bolts
     for (let i = bolts.length - 1; i >= 0; i--) { bolts[i].life -= dt; if (bolts[i].life <= 0) bolts.splice(i, 1); }
@@ -1510,9 +1525,43 @@
     }
   }
 
+  // --- the scarf: a chain of points that lags behind, giving real secondary motion
+  const scarf = [];
+  function updateScarf() {
+    scarf.unshift({
+      x: player.x + player.w / 2 - player.face * 12,
+      y: player.y + player.h * 0.28,
+      t: 1,
+    });
+    for (let i = scarf.length - 1; i >= 0; i--) {
+      scarf[i].t -= 0.045;
+      scarf[i].y += (1.6 + Math.sin(now * 6 + i) * 1.4);   // sag + flutter
+      if (scarf[i].t <= 0) scarf.splice(i, 1);
+    }
+    while (scarf.length > 14) scarf.pop();
+  }
+
+  function drawScarf(accent) {
+    if (scarf.length < 3) return;
+    ctx.save();
+    for (let i = 0; i < scarf.length - 1; i++) {
+      const a = scarf[i], b = scarf[i + 1];
+      const taper = clamp(a.t, 0, 1);
+      ctx.globalAlpha = 0.85 * taper;
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = Math.max(0.6, 7 * taper);
+      ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
   function drawPlayer() {
     const w = player.w, h = player.h;
     const cx = player.x + w / 2, cy = player.y + h / 2;
+    const Z = ZONES[zoneAt(player.x)];
+    const accent = (Z && Z.accent) || "#7cf6ff";
     const air = !player.onGround;
     const v = clamp(player.vy / 900, -1, 1);
     let sx = 1, sy = 1;
@@ -1554,35 +1603,54 @@
     ctx.save(); ctx.translate(w / 2 - 2, -6); ctx.rotate(-aswing * 0.05);
     roundRect(-4, 0, 8, 16, 4); ctx.fill(); ctx.restore();
 
-    // body
+    // body — a hooded figure, tinted to the zone it is standing in
     const grd = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
     if (hurt) { grd.addColorStop(0, "#ffb3b3"); grd.addColorStop(1, "#ff2f2f"); }
-    else { grd.addColorStop(0, "#9dfbff"); grd.addColorStop(0.5, "#4ea6ff"); grd.addColorStop(1, "#2b52e0"); }
+    else { grd.addColorStop(0, accent); grd.addColorStop(0.45, "#2f6ea8"); grd.addColorStop(1, "#1b2c5e"); }
     ctx.fillStyle = grd;
     roundRect(-w / 2, -h / 2, w, h, 13); ctx.fill();
-    ctx.globalAlpha = 0.3;
-    ctx.strokeStyle = "#7cf6ff"; ctx.lineWidth = 5;
+    // rim light picked up from the sky
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = accent; ctx.lineWidth = 5;
     roundRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6, 10); ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.strokeStyle = "rgba(234,255,255,.9)"; ctx.lineWidth = 2;
     roundRect(-w / 2, -h / 2, w, h, 13); ctx.stroke();
 
-    // face
-    const eyeX = player.face * 3;
+    // hood over the face
+    ctx.fillStyle = hurt ? "#8c1a1a" : "#16233f";
+    ctx.beginPath();
+    ctx.moveTo(-13, -2);
+    ctx.quadraticCurveTo(-15, -26, 0, -27);
+    ctx.quadraticCurveTo(15, -26, 13, -2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = accent; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // face plate (a mask, not a face — the Mastermind never shows you one)
+    ctx.fillStyle = hurt ? "#ffd9d9" : "#e9f4ff";
+    roundRect(-10, -22, 20, 18, 7); ctx.fill();
+
+    // face — eyes and mouth sit on the mask plate
+    const eyeX = player.face * 2;
     const blink = h1(Math.floor(now * 3.3)) > 0.93 || dazed;
-    const eyeH = blink ? 1.3 : 5;
-    ctx.fillStyle = "#04060a";
-    ctx.beginPath(); ctx.ellipse(-8 + eyeX, -6, 4.6, eyeH, 0, 0, 6.28); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(9 + eyeX, -6, 4.6, eyeH, 0, 0, 6.28); ctx.fill();
+    const eyeH = blink ? 1.2 : 4.6;
+    const eyeCol = hurt ? "#7a0d12" : accent;
+    ctx.fillStyle = eyeCol;
+    ctx.beginPath(); ctx.ellipse(-6 + eyeX, -14, 4.2, eyeH, 0, 0, 6.28); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(8 + eyeX, -14, 4.2, eyeH, 0, 0, 6.28); ctx.fill();
     if (!blink) {
       ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.arc(-9 + eyeX, -7.4, 1.8, 0, 6.28); ctx.fill();
-      ctx.beginPath(); ctx.arc(8 + eyeX, -7.4, 1.8, 0, 6.28); ctx.fill();
+      ctx.beginPath(); ctx.arc(-7 + eyeX, -15.2, 1.7, 0, 6.28); ctx.fill();
+      ctx.beginPath(); ctx.arc(7 + eyeX, -15.2, 1.7, 0, 6.28); ctx.fill();
     }
-    ctx.strokeStyle = "#04060a"; ctx.lineWidth = 2;
+    // mouth: a flat line, a small smile, or an open scream
+    ctx.strokeStyle = eyeCol; ctx.lineWidth = 2; ctx.lineCap = "round";
     ctx.beginPath();
-    if (hurt || dazed) ctx.arc(eyeX, 15, 6, 1.15 * Math.PI, 1.85 * Math.PI);   // frown
-    else ctx.arc(eyeX, 6, 7, 0.14 * Math.PI, 0.86 * Math.PI);                  // smile
+    if (hurt || dazed) ctx.arc(eyeX, -2, 5, 1.2 * Math.PI, 1.8 * Math.PI);
+    else if (air) { ctx.ellipse(eyeX, -6, 3.2, 3.6, 0, 0, 6.28); ctx.stroke(); }
+    else ctx.arc(eyeX, -9, 6, 0.16 * Math.PI, 0.84 * Math.PI);
     ctx.stroke();
 
     ctx.restore();
@@ -1742,6 +1810,7 @@
     }
     ctx.globalAlpha = 1;
 
+    drawScarf((ZONES[zoneAt(player.x)] || {}).accent || "#7cf6ff");
     drawPlayer();
     drawCosmetics();
     drawForeground(cx);
