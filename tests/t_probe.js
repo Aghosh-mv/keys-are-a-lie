@@ -49,10 +49,15 @@ ok(K().probes === 0, "probes can be spent down to 0");
 K().rollContract();
 it = 0; while (it++ < 500) { const c = K().contract; const b = ["q", "w", "e"].find((k) => k !== c.left && k !== c.right && k !== c.jump); if (b) { global.__b2 = b; break; } K().rollContract(); }
 const pun2 = K().punishments;
-// hold it past the 1.6s camp-punish threshold — deterministic, unlike the
-// deliberate "cruel tease" where a wrong key occasionally just works.
-hold("shift"); hold(global.__b2); tick(130); release(global.__b2); release("shift");
-ok(K().punishments > pun2, "with 0 probes, SHIFT no longer protects you (punished)");
+// holding would do nothing by design; press repeatedly with gaps past the lock
+hold("shift");
+let punished = false;
+for (let i = 0; i < 6 && !punished; i++) {
+  press(global.__b2); tick(40);
+  punished = K().punishments > pun2;
+}
+release("shift");
+ok(punished, "with 0 probes, SHIFT no longer protects you (punished)");
 
 // checkpoints grant a probe
 runTo(1450);

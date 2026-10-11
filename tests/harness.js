@@ -105,12 +105,13 @@ const COIN_X = [600, 905, 1300, 1700, 2090, 2530, 2920, 1330];
 
 // Jump the way a player now must: by CAUSING a disaster that launches you.
 function bounce() {
-  // keep causing disasters until one actually launches you
-  for (let i = 0; i < 60; i++) {
+  // Keep causing disasters until one actually launches you. Each press must be
+  // spaced past FX_LOCK (0.55s) or the "one thing at a time" rule eats it.
+  for (let i = 0; i < 40; i++) {
     const k = wrongKey();
     if (!k) return false;
     press(k);
-    tick(2);
+    tick(36);
     if (K().player.y < 340) return true;   // left the ground
     if (K().state !== "play") return false;
   }
@@ -146,22 +147,43 @@ function T() {
 // a letter guaranteed NOT to be a current control key (so it always punishes)
 function wrongKey() {
   const c = K().contract;
-  return "qwertyuio".split("").find((k) => k !== c.left && k !== c.right && k !== c.jump);
+  return "qwertyuio".split("").find((k) => k !== c.left && k !== c.right && k !== "a" && k !== "d");
 }
 
 // survive by camp-punishing wrong keys until dead (deterministic-ish; camp fires
 // every 1.6s regardless of the "cruel tease")
+// Kill the player on purpose. NOTE: holding a key does nothing by design, so
+// this must press repeatedly with gaps longer than the repeat lock.
 function die(limit, skipCineToo) {
   let g = 0;
-  while (K().state === "play" && g++ < (limit || 120)) {
+  while (K().state === "play" && g++ < (limit || 300)) {
+    // Press on a timer. Launching is free and refused mid-air, but a NON-launch
+    // disaster still costs HP wherever you are — and meanings cycle, so pressing
+    // steadily will eventually land a costly one.
     const k = wrongKey();
-    hold(k); tick(130); release(k); tick(15);
+    if (!k) break;
+    press(k);
+    tick(40);                     // > REPEAT_LOCK and > FX_LOCK
   }
   if (skipCineToo !== false && K().state === "cine") skipCine();
 }
 
+// Press wrong keys until one actually registers. The game's deliberate "cruel
+// tease" means any single wrong key sometimes just works instead of firing,
+// so tests that need "something happened" must be tolerant of that.
+function fireOnce(maxTries) {
+  const p = K().punishments;
+  for (let i = 0; i < (maxTries || 8); i++) {
+    tick(40);
+    press(wrongKey());
+    tick(4);
+    if (K().punishments > p) return true;
+  }
+  return false;
+}
+
 Object.assign(global, {
   els, store, K, press, hold, release, tick, skipCine, startGame, runTo, keyFor, winL, T,
-  wrongKey, die, COIN_X, bounce,
+  wrongKey, die, COIN_X, bounce, fireOnce,
   rafRef: () => raf,
 });

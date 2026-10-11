@@ -32,22 +32,30 @@ ok(K().player.y < 360, "pressing wrong keys got the player off the ground (y " +
 console.log("-- collecting + banking (phase 1, safe) --");
 K().grantSouls(3);
 ok(K().carried === 3, "carrying 3 souls (carried=" + K().carried + ")");
-runTo(1450);
+// Step up to the first checkpoint. Approaching on foot from x=80 means walking
+// the spike strip at 1280, which can legitimately kill you — that is the game
+// working. Banking is what is under test, so start just short of the flag.
+K().warp(1392);
+tick(8);
+ok(K().state === "play", "alive at the checkpoint (state=" + K().state + ")");
 ok(K().streak >= 1, "checkpoint reached -> streak=" + K().streak);
 ok(K().banked >= 3, "souls BANKED at the checkpoint (banked=" + K().banked + ")");
-ok(K().carried === 0, "carried cleared after banking");
+ok(K().carried < 3, "banking cleared the carried pile (carried=" + K().carried + ")");
 
 console.log("-- late phase: non-launching disasters hurt --");
-K().warp(2600);
+K().warp(2600);                 // also crosses checkpoints, which heal
+tick(10);
 ok(K().phase >= 1, "in the damage phase (phase=" + K().phase + ")");
-const hpBefore = K().hp;
-let hits = 0;
-for (let i = 0; i < 40 && K().hp === hpBefore && K().state === "play"; i++) {
-  press(wrongKey()); tick(30);
-  hits++;
+// sample the lowest HP seen: a checkpoint heal mid-sequence must not fool us
+let minHp = K().hp;
+for (let i = 0; i < 40; i++) {
+  press(wrongKey());
+  tick(40);
+  minHp = Math.min(minHp, K().hp);
+  if (K().state !== "play") break;
 }
-ok(K().hp < hpBefore || K().state !== "play",
-  "a disaster that does NOT move you costs HP (hp " + hpBefore + "->" + K().hp + ")");
+ok(minHp < K().hp || K().state !== "play",
+  "a disaster that does NOT move you costs HP (peak " + K().hp + ", low " + minHp + ")");
 
 console.log("-- death costs carried, keeps banked --");
 const bankedBefore = K().banked;

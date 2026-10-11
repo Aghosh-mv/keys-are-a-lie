@@ -127,14 +127,16 @@
   let probes = 3;                // CAREFUL tests — scarce, and the only real information
   const PROBE_MAX = 5;
   const STRAIN_MAX = 4;          // launches before you start paying for them
+  const REPEAT_LOCK = 0.45;      // seconds before the SAME key can fire again
+  const FX_LOCK = 0.55;          // only one disaster may be in flight at a time
+  const lastFire = {};           // id -> when it last fired
+  let fxLockUntil = -1;
 
   const held = new Set();        // currently held key ids
-  const heldSince = {};          // id -> when it was (re)armed, for camp-punish
+  const heldSince = {};          // id -> when it was (re)armed
   // a control key only moves you if you PRESSED it after the current re-roll.
   // (kills the "hold one key and wait for it to become a control key" exploit)
   const armed = { left: false, right: false, jump: false };
-  const campWarn = {};           // id -> already warned while held (per key)
-  const campHits = {};           // id -> consecutive hold-punishes this hold (escalates)
   let jumpBuffer = 0;
 
   // contract = the REAL control keys ; lies = what the manual claims
@@ -337,8 +339,6 @@
     // a newly-rolled control key must be PRESSED again to work: a key you were
     // already holding does not carry over. (anti-exploit)
     armed.left = armed.right = armed.jump = false;
-    for (const id of held) heldSince[id] = now; // fresh camp grace after a roll
-    for (const id in campWarn) { campWarn[id] = false; campHits[id] = 0; }
     elManual.classList.add("glitch");
     tone(200, 0.08, "square", 0.05);
     setTimeout(() => tone(300, 0.08, "square", 0.05), 90);
@@ -717,6 +717,7 @@
   }
 
   function handlePunish(id, stacks) {
+    fxLockUntil = now + FX_LOCK;      // nothing else may fire until this one finishes
     const m = nextMeaning(id);
     punishments++;
     elPunish.textContent = punishments;
@@ -746,6 +747,8 @@
     // knowledge expires and probes are scarce.
     if (held.has("shift")) {
       if (probes > 0) {
+        if (now < fxLockUntil || now - (lastFire[id] || -99) < REPEAT_LOCK) return;
+        lastFire[id] = now;
         probes--; updateHud();
         const role = id === contract.left ? "LEFT" : id === contract.right ? "RIGHT" : null;
         if (role) {
@@ -763,10 +766,18 @@
       showToast("NO PROBES LEFT — CAREFUL DOES NOTHING", 1.4);
     }
 
-    if (id === contract.left || id === contract.right) {
-      // it's a real control key — no punishment
+    if (isControl(id)) {
+      // A/D and the real contract keys are never punished
       return;
     }
+
+    // ONE THING AT A TIME, AND REPEATS DO NOTHING.
+    // Mashing or holding a key must not spray disasters, and a fresh
+    // disaster must not stack on top of one still playing out.
+    if (now < fxLockUntil) return;
+    if (now - (lastFire[id] || -99) < REPEAT_LOCK) return;
+    lastFire[id] = now;
+
     // does a lying manual key occasionally just work? (the cruel tease)
     let work = false, dir = 0;
     if (id === lies.left && Math.random() < 0.13) { work = true; dir = -1; }
@@ -788,15 +799,21 @@
   // Anti-exploit: a key only counts as a control key if it was PRESSED while it
   // was already that control. Holding a key across a contract re-roll does NOT
   // silently hand you control — you must let go and press it again.
+  // A and D ALWAYS move you, in the air as well as on the ground. The secret
+  // contract keys are EXTRA movers on top of that — so the game is never
+  // unplayable because a roll hid something obtuse, but you still gain from
+  // discovering the hidden keys.
+  function movesLeft(id) { return id === contract.left || id === "a"; }
+  function movesRight(id) { return id === contract.right || id === "d"; }
+  function isControl(id) { return movesLeft(id) || movesRight(id); }
+
   function armIfControl(id) {
-    if (id === contract.left) armed.left = true;
-    else if (id === contract.right) armed.right = true;
-    else if (id === contract.jump) armed.jump = true;
+    if (movesLeft(id)) armed.left = true;
+    else if (movesRight(id)) armed.right = true;
   }
   function disarmIfControl(id) {
-    if (id === contract.left) armed.left = false;
-    else if (id === contract.right) armed.right = false;
-    else if (id === contract.jump) armed.jump = false;
+    if (movesLeft(id)) armed.left = false;
+    else if (movesRight(id)) armed.right = false;
   }
 
   window.addEventListener("keydown", (e) => {
@@ -817,12 +834,10 @@
     held.delete(id);
     delete heldSince[id];
     disarmIfControl(id);
-    campWarn[id] = false; campHits[id] = 0;
   });
   window.addEventListener("blur", () => {
     held.clear();
     armed.left = armed.right = armed.jump = false;
-    for (const id in campWarn) { campWarn[id] = false; campHits[id] = 0; }
   });
   window.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -839,7 +854,6 @@
     held.delete(id);
     delete heldSince[id];
     disarmIfControl(id);
-    campWarn[id] = false; campHits[id] = 0;
   });
 
   /* --------------------------------------------------------------- update */
@@ -872,23 +886,7 @@
 
     if (state !== "play") return;
 
-    // camp-punish: holding a punish-key does NOT dodge its meaning — and it
-    // gets WORSE the longer you hold, so "let go" is honest advice, not a bluff.
-    for (const id of held) {
-      if (id === "shift") continue;                    // the CAREFUL modifier is never punished
-      if (id === contract.left || id === contract.right || id === contract.jump) continue;
-      const t = now - (heldSince[id] || now);
-      if (t > 1.6) {
-        heldSince[id] = now;
-        campWarn[id] = false;
-        campHits[id] = (campHits[id] || 0) + 1;
-        handlePunish(id, campHits[id]);                                   // escalating
-        if (campHits[id] >= 2) scr.shake = Math.min(scr.shake + campHits[id] * 4, 34);
-      } else if (t > 1.0 && !campWarn[id]) {
-        campWarn[id] = true;
-        showToast("⚠ HOLDING " + keyLabel(id) + " KEEPS HURTING — LET GO!", 1.2);
-      }
-    }
+    // holding a key does NOTHING further — the repeat lock handles that
 
     // water
     if (water.on) {
@@ -908,6 +906,9 @@
     if (!frozen) {
       if (armed.left && held.has(contract.left)) dir -= 1;
       if (armed.right && held.has(contract.right)) dir += 1;
+      // A and D always move you — on the ground and in mid-air
+      if (held.has("a")) dir -= 1;
+      if (held.has("d")) dir += 1;
     }
     const targetVx = dir * MOVE;
     player.vx += (targetVx - player.vx) * Math.min(1, dt * 16);
@@ -1960,6 +1961,9 @@
   const entities = [];
 
   function spawnEntity(type, emoji, word) {
+    // ONE ACTOR AT A TIME. Two dinosaurs screaming over each other is noise,
+    // not drama — a fresh disaster replaces whatever is still playing.
+    if (entities.length) entities.length = 0;
     const e = {
       type, emoji: emoji || "", word: word || "",
       x: player.x + (Math.random() < 0.5 ? -1 : 1) * rand(320, 520),
