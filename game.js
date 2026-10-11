@@ -453,6 +453,11 @@
   function respawn() {
     state = "play";
     elDeath.classList.add("hidden");
+    // A cutscene left running swallows EVERY keypress (keydown returns early
+    // while cine.on), which the player experiences as "the controls are broken".
+    cine.on = false;
+    cine.after = null;
+    if (elCine) elCine.classList.add("hidden");
     const cp = lastCP >= 0 ? CHECKPOINTS[lastCP] : null;
     player.x = cp ? cp.x : 80;
     player.y = GROUND_Y - player.h;
@@ -469,7 +474,9 @@
   }
 
   /* ------------------------------------------------------------- effects  */
-  function spawnParticle(o) {
+  const MAX_PARTICLES = 90;        // hard ceiling: no effect can ever spray thousands
+function spawnParticle(o) {
+    if (particles.length >= MAX_PARTICLES) return;
     particles.push(Object.assign({
       x: 0, y: 0, vx: 0, vy: 0, life: 2, max: 2, emoji: "❓", size: 34,
       rot: rand(-0.3, 0.3), vr: rand(-3, 3), grav: 900, homing: 0, drag: 0,
@@ -513,11 +520,12 @@
   }
 
   function fxRain(emoji) {
-    for (let i = 0; i < 16; i++) {
+    // only three or four, and they obey gravity properly
+    for (let i = 0; i < 4; i++) {
       spawnParticle({
-        x: camX() - 60 + rand(0, W + 120), y: rand(-260, -40),
-        vx: rand(-30, 30), vy: rand(120, 320), grav: 700,
-        emoji: emoji, size: rand(26, 44), life: rand(2.5, 4), max: 4,
+        x: camX() + rand(80, W - 80), y: rand(-300, -120),
+        vx: rand(-40, 40), vy: rand(60, 180), grav: 1500,
+        emoji: emoji, size: rand(34, 54), life: rand(2.2, 3.4), max: 3.4,
       });
     }
   }
@@ -526,7 +534,7 @@
       const a = rand(0, 6.283), d = rand(160, 320);
       spawnParticle({
         x: player.x + Math.cos(a) * d, y: player.y + Math.sin(a) * d - 40,
-        vx: 0, vy: 0, grav: 0, homing: 1, emoji: emoji,
+        vx: 0, vy: 0, grav: 220, homing: 1, emoji: emoji,
         size: rand(26, 38), life: rand(4, 6), max: 6, drag: 1.6,
       });
     }
@@ -907,18 +915,23 @@
     }
 
     // player control
+    // FROZEN is now "on ice", not "input dead": you keep steering, but slowly
+    // and with slide. Zeroing `dir` here made A and D feel broken for 1.4s.
     const frozen = now < freezeUntil;
     const xaxis = now < xaxisUntil;
     let dir = 0;
-    if (!frozen) {
-      if (armed.left && held.has(contract.left)) dir -= 1;
-      if (armed.right && held.has(contract.right)) dir += 1;
-      // A and D always move you — on the ground and in mid-air
-      if (held.has("a")) dir -= 1;
-      if (held.has("d")) dir += 1;
-    }
-    const targetVx = dir * MOVE;
-    player.vx += (targetVx - player.vx) * Math.min(1, dt * 16);
+    if (armed.left && held.has(contract.left)) dir -= 1;
+    if (armed.right && held.has(contract.right)) dir += 1;
+    // A and D always move you — on the ground and in mid-air
+    if (held.has("a")) dir -= 1;
+    if (held.has("d")) dir += 1;
+    dir = clamp(dir, -1, 1);
+    // on ice: authority and top speed both drop, and momentum carries you
+    const speed = frozen ? MOVE * 0.30 : MOVE;
+    const grip = frozen ? 2.5 : 16;
+    const targetVx = dir * speed;
+    player.vx += (targetVx - player.vx) * Math.min(1, dt * grip);
+    if (!dir) player.vx *= Math.pow(frozen ? 0.55 : 0.0001, dt);   // slide, or stop
 
     // jump (buffered; only a key you actually pressed while it was the jump key)
     jumpBuffer -= dt;
@@ -1109,6 +1122,8 @@
     freezeUntil = -1; xaxisUntil = -1; pullUntil = -1; revealUntil = -1;
     elWin.classList.add("hidden");
     elDeath.classList.add("hidden");
+    cine.on = false; cine.after = null;
+    if (elCine) elCine.classList.add("hidden");
     elManual.classList.remove("reveal");
     rollContract();
     updateHud();
@@ -2640,6 +2655,8 @@
       return true;
     },
     get probes() { return probes; },
+    get particleCount() { return particles.length; },
+    get actorCount() { return entities.length; },
     get blocked() {
       return {
         state, frozen: now < freezeUntil, xaxis: now < xaxisUntil,

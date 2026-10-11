@@ -1,7 +1,29 @@
 # KEYS ARE A LIE
 
-**Team:** justcode
-**Members:** Aghosh-mv
+**Team:** justcode  ·  **Member:** Aghosh-mv
+
+A troll platformer where **punishment is the movement system** — you win by
+hurting yourself.
+
+| | |
+| --- | --- |
+| **Live repo** | https://github.com/Aghosh-mv/keys-are-a-lie |
+| **Download this submission** | https://raw.githubusercontent.com/Aghosh-mv/keys-are-a-lie/main/dist/keys-are-a-lie.zip |
+| **Play in a browser** | Open `index.html` — no build, no install, no internet |
+| **Tech** | Plain HTML/CSS/JS. Zero dependencies. Runs from `file://` |
+| **Video** | `gameplay.mp4` — 3:35 real gameplay capture |
+
+---
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![title](dist/screenshots/07-title.png) **The title screen** — the manual is already lying to you | ![shrine](dist/screenshots/01-bamboo-shrine.png) **Act I — Bamboo Shrine** |
+| ![forest](dist/screenshots/02-spirit-forest.png) **Act II — Spirit Forest** | ![gate](dist/screenshots/03-red-gate.png) **Act III — Red Gate** |
+| ![dragon](dist/screenshots/04-dragons-end.png) **Act IV — Dragon's End** | ![codex](dist/screenshots/05-codex.png) **The Codex** — knowledge that survives death |
+
+Further: `dist/screenshots/06-dealer.png` (The Dealer), `dist/screenshots/08-cutscene.png` (a Mastermind cutscene).
 
 ---
 
@@ -102,6 +124,32 @@ is a game about a dishonest game.
 
 ---
 
+## Repository & guidance
+
+The complete source lives in the public repo, including commit history:
+
+```bash
+git clone https://github.com/Aghosh-mv/keys-are-a-lie.git
+cd keys-are-a-lie
+# open index.html  — that is the whole setup
+bash tests/run_all.sh        # optional: 6 suites, 82 assertions, ~2s
+```
+
+Everything in the game is generated or embedded in four files. There is no art
+pipeline, no asset pipeline, no build step, and no network access at runtime —
+the "art" is drawn with the Canvas 2D API and the sound is synthesised with
+WebAudio, so the whole game is self-contained text.
+
+If you want to regenerate the submission media:
+
+```bash
+node tools/shots.js                 # the screenshots in this README
+node tools/record.js out.mp4 200    # records a real playthrough via CDP screencast
+```
+
+
+---
+
 ## Contents
 
 | File | What it is |
@@ -109,11 +157,14 @@ is a game about a dishonest game.
 | `index.html` | Page shell, HUD, overlays |
 | `game.js` | The entire game — engine, art, audio, cutscenes, actors |
 | `lexicon.js` | The lie database: 700+ meanings across 42 keys |
-| `style.css` | Styling, bloom layer, CRT treatment |
-| `screenshot.png` | Gameplay screenshot |
-| `gameplay.mp4` | 3–5 minute gameplay recording |
-| `tests/` | Headless regression suites (`bash tests/run_all.sh`) |
-| `tools/` | The screencast recorder used to make the video |
+| `style.css` | Styling, additive bloom layer, CRT treatment |
+| `README.md` | This file |
+| `gameplay.mp4` | 3:35 gameplay recording (real screencast) |
+| `screenshot.png` | Hero screenshot |
+| `dist/screenshots/` | All eight screenshots used above |
+| `tests/` | Headless regression suites — `bash tests/run_all.sh` |
+| `tools/` | Screenshot + screencast recorders |
+
 
 Controls: **A / D** always move you (including in the air). **Hold SHIFT + a key**
 to probe it safely.
